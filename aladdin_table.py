@@ -39,8 +39,10 @@ class AladdinTable(object):
         self.estimator_name =  "Aladdin_table"
 
         # example primitive classes supported by this estimator
-        self.supported_pc = ['regfile', 'mac', 'wire',
-                             'bitwise', 'fpmac', 'adder', 'multiplier', 'fpadder', 'fpmultiplier']
+        self.supported_pc = ['regfile',
+                             'bitwise', 'adder', 'multiplier', 'mac',
+                            'fp32adder', 'fp32multiplier', 'fp32mac',
+                            'fp64adder', 'fp64multiplier', 'fp64mac']
 
     def primitive_action_supported(self, interface):
         """
@@ -127,10 +129,17 @@ class AladdinTable(object):
         energy = adder_energy + multiplier_energy
         return energy
 
-    def fpmac_estimate_energy(self, interface):
+    def fp32mac_estimate_energy(self, interface):
         # fpmac is naively modeled as fpadder and fpmultiplier
-        fpadder_energy = self.fpadder_estimate_energy(interface)
-        fpmultiplier_energy = self.fpmultiplier_estimate_energy(interface)
+        fpadder_energy = self.fp32adder_estimate_energy(interface)
+        fpmultiplier_energy = self.fp32multiplier_estimate_energy(interface)
+        energy = fpadder_energy + fpmultiplier_energy
+        return energy
+
+    def fp64mac_estimate_energy(self, interface):
+        # fpmac is naively modeled as fpadder and fpmultiplier
+        fpadder_energy = self.fp64adder_estimate_energy(interface)
+        fpmultiplier_energy = self.fp64multiplier_estimate_energy(interface)
         energy = fpadder_energy + fpmultiplier_energy
         return energy
 
@@ -142,7 +151,16 @@ class AladdinTable(object):
         energy = oneD_linear_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
         return energy
 
-    def fpadder_estimate_energy(self, interface):
+    def fp32adder_estimate_energy(self, interface):
+        this_dir, this_filename = os.path.split(__file__)
+        # Aladdin plug-in uses the double precision table for floating point adders
+        csv_file_path = os.path.join(this_dir, 'data/fp_sp_adder.csv')
+        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        # since Aladdin only provides 32 bit adder energy, perform linear interpolation in terms of datawidth
+        energy = oneD_linear_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
+        return energy
+
+    def fp64adder_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         # Aladdin plug-in uses the double precision table for floating point adders
         csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
@@ -159,7 +177,16 @@ class AladdinTable(object):
         energy = oneD_quadratic_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
         return energy
 
-    def fpmultiplier_estimate_energy(self, interface):
+    def fp32multiplier_estimate_energy(self, interface):
+        this_dir, this_filename = os.path.split(__file__)
+        # Aladdin plug-in uses the double precision table for floating point multipliers
+        csv_file_path = os.path.join(this_dir, 'data/fp_sp_multiplier.csv')
+        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        # since Aladdin only provides 32 bit adder energy, perform quadratic interpolation in terms of datawidth
+        energy = oneD_quadratic_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
+        return energy
+
+    def fp64multiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         # Aladdin plug-in uses the double precision table for floating point multipliers
         csv_file_path = os.path.join(this_dir, 'data/fp_dp_multiplier.csv')
