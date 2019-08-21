@@ -57,8 +57,11 @@ class AladdinTable(object):
         :rtype: int
 
         """
+        if 'technology' not in interface['attributes']:
+            print('ALADDIN WARN: no technology specified in the request, cannot perform estimation')
         class_name = interface['class_name']
-        if class_name in self.supported_pc:
+        technology = interface['attributes']['technology']
+        if (technology == 40  or technology == '40' or technology == '40nm') and class_name in self.supported_pc:
             return ALADDIN_ACCURACY
         return 0  # if not supported, accuracy is 0
 
