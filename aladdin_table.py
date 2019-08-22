@@ -109,11 +109,11 @@ class AladdinTable(object):
                     break
         return energy
 
-    def regFile_estimate_energy(self, interface):
+    def regfile_estimate_energy(self, interface):
         # register file access is naively modeled as vector access of registers
         # register energy consumption is generated according to latency
 
-        width = interface['attributes']['width']
+        width = interface['attributes']['datawidth']
         this_dir, this_filename = os.path.split(__file__)
         csv_file_path = os.path.join(this_dir, 'data/reg.csv')
         reg_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
@@ -147,61 +147,47 @@ class AladdinTable(object):
         this_dir, this_filename = os.path.split(__file__)
         csv_file_path = os.path.join(this_dir, 'data/adder.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform linear interpolation in terms of datawidth
-        energy = oneD_linear_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
-        return energy
+        return csv_energy
 
     def fp32adder_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         # Aladdin plug-in uses the double precision table for floating point adders
         csv_file_path = os.path.join(this_dir, 'data/fp_sp_adder.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform linear interpolation in terms of datawidth
-        energy = oneD_linear_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
-        return energy
+        return csv_energy
 
     def fp64adder_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         # Aladdin plug-in uses the double precision table for floating point adders
         csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform linear interpolation in terms of datawidth
-        energy = oneD_linear_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
-        return energy
+        return csv_energy
 
     def multiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         csv_file_path = os.path.join(this_dir, 'data/multiplier.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform quadratic interpolation in terms of datawidth
-        energy = oneD_quadratic_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
-        return energy
+        return csv_energy
 
     def fp32multiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         # Aladdin plug-in uses the double precision table for floating point multipliers
         csv_file_path = os.path.join(this_dir, 'data/fp_sp_multiplier.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform quadratic interpolation in terms of datawidth
-        energy = oneD_quadratic_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
-        return energy
+        return csv_energy
 
     def fp64multiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         # Aladdin plug-in uses the double precision table for floating point multipliers
         csv_file_path = os.path.join(this_dir, 'data/fp_dp_multiplier.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform quadratic interpolation in terms of datawidth
-        energy = oneD_quadratic_interpolation(interface['attributes']['datawidth'], [{'x' : 0, 'y' : 0 }, {'x': 32, 'y': csv_energy}])
-        return energy
+        return csv_energy
 
     def bitwise_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
         csv_file_path = os.path.join(this_dir, 'data/bitwise.csv')
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        # since Aladdin only provides 32 bit adder energy, perform quadratic interpolation in terms of datawidth
-        energy = csv_energy * interface['attributes']['num']
-        return energy
+        return csv_energy
 
 # helper function
 def oneD_quadratic_interpolation(desired_x, known):
