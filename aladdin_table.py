@@ -23,7 +23,8 @@ ALADDIN_ACCURACY = 70  # in your metric, please set the accuracy you think Aladd
 # SOFTWARE.
 
 import csv, os, sys, math
-from accelergy.helper_functions import oneD_linear_interpolation
+from copy import deepcopy
+from accelergy.helper_functions import oneD_linear_interpolation, oneD_quadratic_interpolation
 
 class AladdinTable(object):
     """
@@ -39,10 +40,9 @@ class AladdinTable(object):
         self.estimator_name =  "Aladdin_table"
 
         # example primitive classes supported by this estimator
-        self.supported_pc = ['regfile',
-                             'bitwise', 'adder', 'multiplier', 'mac',
-                            'fp32adder', 'fp32multiplier', 'fp32mac',
-                            'fp64adder', 'fp64multiplier', 'fp64mac']
+        self.supported_pc = ['regfile', 'counter', 'comparator', 'crossbar', 'wire', 'FIFO',
+                             'bitwise', 'intadder', 'intmultiplier', 'intmac',
+                             'fpadder', 'fpmultiplier', 'fpmac']
 
     def primitive_action_supported(self, interface):
         """
@@ -94,7 +94,10 @@ class AladdinTable(object):
         # default latency for Aladdin estimation is 5ns
         latency = interface['attributes']['latency'] if 'latency' in interface['attributes'] else 5
         # round to an existing latency (can perform linear interpolation as well)
-        latency = math.ceil(float(latency.split('ns')[0]))
+        if type(latency) is str and 'ns' in latency:
+            latency = math.ceil(float(latency.split('ns')[0]))
+        else:
+            latency = math.ceil(latency)
         if latency > 10:
             latency = 10
         elif latency > 6:
@@ -114,74 +117,186 @@ class AladdinTable(object):
         # register energy consumption is generated according to latency
 
         width = interface['attributes']['width']
+        depth = interface['attributes']['depth']
+        this_dir, this_filename = os.path.split(__file__)
+        csv_file_path = os.path.join(this_dir, 'data/reg.csv')
+        if depth == 0:
+            return 0
+        if interface['action_name'] == 'idle':
+            action_name = 'idle'
+        elif 'arguments' in interface:
+            data_delta = interface['arguments']['data_delta']
+            address_delta = interface['arguments']['address_delta']
+            if data_delta == 0 and address_delta == 0:
+                action_name = 'idle'
+            else:
+                action_name = 'access'
+        else:
+            action_name = 'access'
+
+        reg_interface = deepcopy(interface)
+        reg_interface['action_name'] = action_name
+        reg_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+
+        crossbar_interface = {'attributes': {'datawidth': width},
+                              'action_name': action_name}
+        crossbar_energy = self.comparator_estimate_energy(crossbar_interface)
+
+        comparator_interface = {'attributes': {'datawidth': math.log2(float(depth))},
+                              'action_name': action_name}
+        comparator_energy = self.comparator_estimate_energy(comparator_interface)
+        # register file access is naively modeled as vector access of registers
+        reg_file_energy = reg_energy * width + comparator_energy + crossbar_energy
+        return reg_file_energy
+
+    def FIFO_estimate_energy(self, interface):
+        datawidth = interface['attributes']['datawidth']
+        depth = interface['attributes']['depth']
+        if depth == 0:
+            return 0
         this_dir, this_filename = os.path.split(__file__)
         csv_file_path = os.path.join(this_dir, 'data/reg.csv')
         reg_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        reg_file_energy = reg_energy * width  # register file access is naively modeled as vector access of registers
-        return reg_file_energy
 
-    # ----------------- mac related ---------------------------
-    
-    def mac_estimate_energy(self, interface):
+        if interface['action_name'] == 'idle':
+            action_name = 'idle'
+        else:
+            action_name = 'access'
+
+        comparator_interface = {'attributes': {'datawidth': math.log2(float(depth))},
+                                'action_name': action_name}
+        comparator_energy = self.comparator_estimate_energy(comparator_interface)
+        energy = reg_energy * datawidth + comparator_energy
+        return energy
+
+
+    def crossbar_estimate_energy(self, interface):
+        n_inputs = interface['attributes']['n_inputs']
+        n_outputs = interface['attributes']['n_outputs']
+        datawidth = interface['attributes']['datawidth']
+        this_dir, this_filename = os.path.split(__file__)
+        csv_file_path = os.path.join(this_dir, 'data/crossbar.csv')
+        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        crossbar_energy = csv_energy * n_inputs * (n_outputs/4) * (datawidth/32)
+        return crossbar_energy
+
+    def counter_estimate_energy(self, interface):
+        width = interface['attributes']['width']
+        this_dir, this_filename = os.path.split(__file__)
+        csv_file_path = os.path.join(this_dir, 'data/counter.csv')
+        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        energy = csv_energy * (width/32)
+        return energy
+
+    def wire_estimate_energy(self, interface):
+        action_name = interface['action_name']
+        if action_name == 'transfer':
+            len_str = interface['attributes']['length']
+            if 'm' not in len_str:
+                length = float(len_str)
+            else:
+                if 'mm' in len_str:
+                    length = float(len_str.split['mm'])*10**-3
+                elif 'um' in len_str:
+                    length = float(len_str.split['mm']) * 10 ** -6
+                elif 'nm' in len_str:
+                    length = float(len_str.split['mm']) * 10 ** -9
+                else:
+                    print('ALADDIN WARN: not recognizing the unit of the wire length, 0 energy')
+                    length = 0
+
+            datawidth = interface['attributes']['datawidth']
+            C = 1.627 * 10**-15
+            VDD = 1
+            alpha = 0.2
+            E = datawidth * alpha * C * length * VDD ** 2 * 10**12
+            return E
+        else:
+            return 0
+
+    def comparator_estimate_energy(self, interface):
+        datawidth = interface['attributes']['datawidth']
+        this_dir, this_filename = os.path.split(__file__)
+        csv_file_path = os.path.join(this_dir, 'data/comparator.csv')
+        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        energy = csv_energy * (datawidth/32)
+        return energy
+
+    def intmac_estimate_energy(self, interface):
         # mac is naively modeled as adder and multiplier
-        adder_energy = self.adder_estimate_energy(interface)
-        multiplier_energy = self.multiplier_estimate_energy(interface)
+        multiplier_interface = deepcopy(interface)
+        if interface['action_name'] == 'mac_gated':
+            multiplier_interface['action_name'] = 'mult_gated'
+        elif interface['action_name'] == 'mac_reused':
+            multiplier_interface['action_name'] = 'mult_reused'
+        else:
+            multiplier_interface['action_name'] = 'mult_random'
+        adder_energy = self.intadder_estimate_energy(interface)
+        multiplier_energy = self.intmultiplier_estimate_energy(multiplier_interface)
         energy = adder_energy + multiplier_energy
         return energy
 
-    def fp32mac_estimate_energy(self, interface):
+    def fpmac_estimate_energy(self, interface):
         # fpmac is naively modeled as fpadder and fpmultiplier
-        fpadder_energy = self.fp32adder_estimate_energy(interface)
-        fpmultiplier_energy = self.fp32multiplier_estimate_energy(interface)
+        fpadder_energy = self.fpadder_estimate_energy(interface)
+        fpmultiplier_energy = self.fpmultiplier_estimate_energy(interface)
         energy = fpadder_energy + fpmultiplier_energy
         return energy
 
-    def fp64mac_estimate_energy(self, interface):
-        # fpmac is naively modeled as fpadder and fpmultiplier
-        fpadder_energy = self.fp64adder_estimate_energy(interface)
-        fpmultiplier_energy = self.fp64multiplier_estimate_energy(interface)
-        energy = fpadder_energy + fpmultiplier_energy
-        return energy
-
-    def adder_estimate_energy(self, interface):
+    def intadder_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
+        nbit = interface['attributes']['datawidth']
+        csv_nbit = 32
         csv_file_path = os.path.join(this_dir, 'data/adder.csv')
-        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        return csv_energy
+        energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        if not nbit == csv_nbit:
+            energy = oneD_linear_interpolation(nbit, [{'x': 0, 'y': 0}, {'x': csv_nbit, 'y': energy}])
+        return energy
 
-    def fp32adder_estimate_energy(self, interface):
+    def fpadder_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
-        # Aladdin plug-in uses the double precision table for floating point adders
-        csv_file_path = os.path.join(this_dir, 'data/fp_sp_adder.csv')
-        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        return csv_energy
+        nbit_exponent = interface['attributes']['exponent']
+        nbit_mantissa = interface['attributes']['mantissa']
+        nbit = nbit_mantissa + nbit_exponent
+        if nbit_exponent + nbit_mantissa <= 32:
+            csv_nbit = 32
+            csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
+        else:
+            csv_nbit = 64
+            csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
+        energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        if not nbit == csv_nbit:
+            energy = oneD_linear_interpolation(nbit, [{'x': 0, 'y': 0}, {'x': csv_nbit, 'y': energy}])
+        return energy
 
-    def fp64adder_estimate_energy(self, interface):
+    def intmultiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
-        # Aladdin plug-in uses the double precision table for floating point adders
-        csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
-        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        return csv_energy
-
-    def multiplier_estimate_energy(self, interface):
-        this_dir, this_filename = os.path.split(__file__)
+        nbit = interface['attributes']['datawidth']
+        action_name = interface['action_name']
+        if action_name == 'mult_gated':
+            interface['action_name'] = 'idle'  # reflect gated multiplier energy
+        csv_nbit = 32
         csv_file_path = os.path.join(this_dir, 'data/multiplier.csv')
-        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        return csv_energy
+        energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        if not nbit == csv_nbit:
+            energy = oneD_quadratic_interpolation(nbit, [{'x': 0, 'y': 0}, {'x': csv_nbit, 'y': energy}])
+        return energy
 
-    def fp32multiplier_estimate_energy(self, interface):
+    def fpmultiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
-        # Aladdin plug-in uses the double precision table for floating point multipliers
-        csv_file_path = os.path.join(this_dir, 'data/fp_sp_multiplier.csv')
-        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        return csv_energy
-
-    def fp64multiplier_estimate_energy(self, interface):
-        this_dir, this_filename = os.path.split(__file__)
-        # Aladdin plug-in uses the double precision table for floating point multipliers
-        csv_file_path = os.path.join(this_dir, 'data/fp_dp_multiplier.csv')
-        csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-        return csv_energy
+        nbit_exponent = interface['attributes']['exponent']
+        nbit_mantissa = interface['attributes']['mantissa']
+        nbit = nbit_mantissa + nbit_exponent
+        if nbit_exponent + nbit_mantissa <= 32:
+            csv_nbit = 32
+            csv_file_path = os.path.join(this_dir, 'data/fp_sp_multiplier.csv')
+        else:
+            csv_nbit = 64
+            csv_file_path = os.path.join(this_dir, 'data/fp_dp_multiplier.csv')
+        energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+        if not nbit == csv_nbit:
+            energy = oneD_quadratic_interpolation(nbit, [{'x': 0, 'y': 0}, {'x': csv_nbit, 'y': energy}])
+        return energy
 
     def bitwise_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
@@ -189,22 +304,22 @@ class AladdinTable(object):
         csv_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
         return csv_energy
 
-# helper function
-def oneD_quadratic_interpolation(desired_x, known):
-    """
-    utility function that performs 1D linear interpolation with a known energy value
-    :param desired_x: integer value of the desired attribute/argument
-    :param known: list of dictionary [{x: <value>, y: <energy>}]
-
-    :return energy value with desired attribute/argument
-
-    """
-    ordered_list = []
-    if known[1]['x'] < known[0]['x']:
-        ordered_list[0] = known[1]['x']
-    else:
-        ordered_list = known
-
-    slope = (known[1]['y'] - known[0]['y']) / (known[1]['x'] - known[0]['x'])
-    desired_energy = slope**2 * (desired_x - ordered_list[0]['x']) + ordered_list[0]['y']
-    return desired_energy
+# # helper function (if your accelergy version is < 0.2 use this function directly instead of import)
+# def oneD_quadratic_interpolation(desired_x, known):
+#     """
+#     utility function that performs 1D linear interpolation with a known energy value
+#     :param desired_x: integer value of the desired attribute/argument
+#     :param known: list of dictionary [{x: <value>, y: <energy>}]
+#
+#     :return energy value with desired attribute/argument
+#
+#     """
+#     ordered_list = []
+#     if known[1]['x'] < known[0]['x']:
+#         ordered_list[0] = known[1]['x']
+#     else:
+#         ordered_list = known
+#
+#     slope = (known[1]['y'] - known[0]['y']) / (known[1]['x'] - known[0]['x'])
+#     desired_energy = slope**2 * (desired_x - ordered_list[0]['x']) + ordered_list[0]['y']
+#     return desired_energy
