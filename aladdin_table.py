@@ -94,7 +94,7 @@ class AladdinTable(object):
         # default latency for Aladdin estimation is 5ns
         latency = interface['attributes']['latency'] if 'latency' in interface['attributes'] else 5
         # round to an existing latency (can perform linear interpolation as well)
-        latency = math.ceil(latency)
+        latency = math.ceil(float(latency.split('ns')[0]))
         if latency > 10:
             latency = 10
         elif latency > 6:
@@ -113,7 +113,7 @@ class AladdinTable(object):
         # register file access is naively modeled as vector access of registers
         # register energy consumption is generated according to latency
 
-        width = interface['attributes']['datawidth']
+        width = interface['attributes']['width']
         this_dir, this_filename = os.path.split(__file__)
         csv_file_path = os.path.join(this_dir, 'data/reg.csv')
         reg_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
