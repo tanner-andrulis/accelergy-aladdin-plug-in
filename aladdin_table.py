@@ -229,6 +229,8 @@ class AladdinTable(object):
             multiplier_interface['action_name'] = 'mult_gated'
         elif interface['action_name'] == 'mac_reused':
             multiplier_interface['action_name'] = 'mult_reused'
+        elif interface['action_name'] == 'idle':
+            multiplier_interface['action_name'] = 'idle'
         else:
             multiplier_interface['action_name'] = 'mult_random'
         adder_energy = self.intadder_estimate_energy(interface)
