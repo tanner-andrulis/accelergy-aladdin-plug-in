@@ -122,31 +122,30 @@ class AladdinTable(object):
         csv_file_path = os.path.join(this_dir, 'data/reg.csv')
         if depth == 0:
             return 0
-        if interface['action_name'] == 'idle':
-            action_name = 'idle'
-        elif 'arguments' in interface:
+        action_name = interface['action_name']
+
+        if action_name == 'idle':
+            reg_interface = deepcopy(interface)
+            reg_energy = AladdinTable.query_csv_using_latency(reg_interface, csv_file_path)
+            comparator_interface = {'attributes': {'datawidth': math.ceil(math.log2(float(depth)))},
+                                    'action_name': 'idle'}
+            comparator_energy = self.comparator_estimate_energy(comparator_interface)
+        else:
             data_delta = interface['arguments']['data_delta']
             address_delta = interface['arguments']['address_delta']
-            if data_delta == 0 and address_delta == 0:
-                action_name = 'idle'
+            reg_interface = deepcopy(interface)
+            if data_delta == 0:
+                reg_interface['action_name'] = 'idle'
+            reg_energy = AladdinTable.query_csv_using_latency(reg_interface, csv_file_path)
+            if address_delta == 0:
+                comp_action = 'idle'
             else:
-                action_name = 'access'
-        else:
-            action_name = 'access'
-
-        reg_interface = deepcopy(interface)
-        reg_interface['action_name'] = action_name
-        reg_energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
-
-        crossbar_interface = {'attributes': {'datawidth': width},
-                              'action_name': action_name}
-        crossbar_energy = self.comparator_estimate_energy(crossbar_interface)
-
-        comparator_interface = {'attributes': {'datawidth': math.log2(float(depth))},
-                              'action_name': action_name}
-        comparator_energy = self.comparator_estimate_energy(comparator_interface)
+                comp_action = action_name
+            comparator_interface = {'attributes': {'datawidth': math.ceil(math.log2(float(depth)))},
+                                        'action_name': comp_action}
+            comparator_energy = self.comparator_estimate_energy(comparator_interface)
         # register file access is naively modeled as vector access of registers
-        reg_file_energy = reg_energy * width + comparator_energy + crossbar_energy
+        reg_file_energy = reg_energy * width + comparator_energy * depth
         return reg_file_energy
 
     def FIFO_estimate_energy(self, interface):
@@ -240,6 +239,15 @@ class AladdinTable(object):
 
     def fpmac_estimate_energy(self, interface):
         # fpmac is naively modeled as fpadder and fpmultiplier
+        multiplier_interface = deepcopy(interface)
+        if interface['action_name'] == 'mac_gated':
+            multiplier_interface['action_name'] = 'mult_gated'
+        elif interface['action_name'] == 'mac_reused':
+            multiplier_interface['action_name'] = 'mult_reused'
+        elif interface['action_name'] == 'idle':
+            multiplier_interface['action_name'] = 'idle'
+        else:
+            multiplier_interface['action_name'] = 'mult_random'
         fpadder_energy = self.fpadder_estimate_energy(interface)
         fpmultiplier_energy = self.fpmultiplier_estimate_energy(interface)
         energy = fpadder_energy + fpmultiplier_energy
@@ -280,12 +288,18 @@ class AladdinTable(object):
         csv_nbit = 32
         csv_file_path = os.path.join(this_dir, 'data/multiplier.csv')
         energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
+
         if not nbit == csv_nbit:
             energy = oneD_quadratic_interpolation(nbit, [{'x': 0, 'y': 0}, {'x': csv_nbit, 'y': energy}])
+        if action_name == 'mult_reused':
+            energy = 0.85 * energy
         return energy
 
     def fpmultiplier_estimate_energy(self, interface):
         this_dir, this_filename = os.path.split(__file__)
+        action_name = interface['action_name']
+        if action_name == 'mult_gated':
+            interface['action_name'] = 'idle'  # reflect gated multiplier energy
         nbit_exponent = interface['attributes']['exponent']
         nbit_mantissa = interface['attributes']['mantissa']
         nbit = nbit_mantissa + nbit_exponent
@@ -298,6 +312,8 @@ class AladdinTable(object):
         energy = AladdinTable.query_csv_using_latency(interface, csv_file_path)
         if not nbit == csv_nbit:
             energy = oneD_quadratic_interpolation(nbit, [{'x': 0, 'y': 0}, {'x': csv_nbit, 'y': energy}])
+        if action_name == 'mult_reused':
+            energy = 0.85 * energy
         return energy
 
     def bitwise_estimate_energy(self, interface):
