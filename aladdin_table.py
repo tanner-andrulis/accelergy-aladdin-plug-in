@@ -270,7 +270,7 @@ class AladdinTable(object):
         nbit = nbit_mantissa + nbit_exponent
         if nbit_exponent + nbit_mantissa <= 32:
             csv_nbit = 32
-            csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
+            csv_file_path = os.path.join(this_dir, 'data/fp_sp_adder.csv')
         else:
             csv_nbit = 64
             csv_file_path = os.path.join(this_dir, 'data/fp_dp_adder.csv')
