@@ -332,12 +332,14 @@ class AladdinTable(object):
 #     :return energy value with desired attribute/argument
 #
 #     """
+#     # assume E = ax^2 + c where x is a hardware attribute
 #     ordered_list = []
 #     if known[1]['x'] < known[0]['x']:
-#         ordered_list[0] = known[1]['x']
+#         ordered_list.append(known[1])
+#         ordered_list.append(known[0])
 #     else:
 #         ordered_list = known
 #
-#     slope = (known[1]['y'] - known[0]['y']) / (known[1]['x'] - known[0]['x'])
-#     desired_energy = slope**2 * (desired_x - ordered_list[0]['x']) + ordered_list[0]['y']
+#     slope = (known[1]['y'] - known[0]['y']) / (known[1]['x']**2 - known[0]['x']**2)
+#     desired_energy = slope * (desired_x**2 - ordered_list[0]['x']**2) + ordered_list[0]['y']
 #     return desired_energy
