@@ -64,7 +64,9 @@ class AladdinTable(object):
             print('ALADDIN WARN: no technology specified in the request, cannot perform estimation')
         class_name = interface['class_name']
         technology = interface['attributes']['technology']
-        if (technology == 40  or technology == '40' or technology == '40nm') and class_name in self.supported_pc:
+        if (technology == 40  or technology == '40' or technology == '40nm' or
+            technology == 45  or technology == '45' or technology == '45nm') \
+                and class_name in self.supported_pc:
             return ALADDIN_ACCURACY
         return 0  # if not supported, accuracy is 0
 
@@ -104,7 +106,8 @@ class AladdinTable(object):
             print('ALADDIN WARN: no technology specified in the request, cannot perform estimation')
         class_name = interface['class_name']
         technology = interface['attributes']['technology']
-        if (technology == 40  or technology == '40' or technology == '40nm') \
+        if (technology == 40  or technology == '40' or technology == '40nm' or
+            technology == 45  or technology == '45' or technology == '45nm') \
                 and class_name in self.supported_pc and not class_name == 'wire':
             return ALADDIN_ACCURACY
         return 0  # if not supported, accuracy is 0
@@ -135,6 +138,8 @@ class AladdinTable(object):
         # round to an existing latency (can perform linear interpolation as well)
         if type(latency) is str and 'ns' in latency:
             latency = math.ceil(float(latency.split('ns')[0]))
+        elif type(latency) is str and 'ps' in latency:
+            latency = math.ceil(float(latency.split('ps')[0])/1000)
         else:
             latency = math.ceil(latency)
         if latency > 10:
