@@ -42,7 +42,7 @@ class AladdinTable(object):
         # example primitive classes supported by this estimator
         self.supported_pc = ['regfile', 'counter', 'comparator', 'crossbar', 'wire', 'FIFO',
                              'bitwise', 'intadder', 'intmultiplier', 'intmac',
-                             'fpadder', 'fpmultiplier', 'fpmac']
+                             'fpadder', 'fpmultiplier', 'fpmac', 'reg']
         self.aladdin_area_quries = AladdinAreaQueires(self.supported_pc)
 
     def primitive_action_supported(self, interface):
@@ -188,6 +188,13 @@ class AladdinTable(object):
         # register file access is naively modeled as vector access of registers
         reg_file_energy = reg_energy * width + comparator_energy * depth
         return reg_file_energy
+
+    def reg_estimate_energy(self, interface):
+        this_dir, this_filename = os.path.split(__file__)
+        csv_file_path = os.path.join(this_dir, 'data/reg.csv')
+        reg_interface = deepcopy(interface)
+        reg_energy = AladdinTable.query_csv_using_latency(reg_interface, csv_file_path)
+        return reg_energy
 
     def FIFO_estimate_energy(self, interface):
         datawidth = interface['attributes']['datawidth']
@@ -421,6 +428,13 @@ class AladdinAreaQueires():
         # register file access is naively modeled as vector access of registers
         reg_file_area = reg_area * width + comparator_area * depth
         return reg_file_area
+
+    def reg_estimate_area(self, interface):
+        this_dir, this_filename = os.path.split(__file__)
+        reg_interface = deepcopy(interface)
+        csv_file_path = os.path.join(this_dir, 'data/reg.csv')
+        reg_area = AladdinAreaQueires.query_csv_area_using_latency(reg_interface, csv_file_path)
+        return reg_area
 
     def FIFO_estimate_area(self, interface):
         datawidth = interface['attributes']['datawidth']
