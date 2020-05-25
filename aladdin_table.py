@@ -261,10 +261,6 @@ class AladdinTable(object):
         else:
             return 0
 
-    def wire_estimate_area(self, interface):
-        # ignore the area of the wires
-        return 0
-
     def comparator_estimate_energy(self, interface):
         datawidth = interface['attributes']['datawidth']
         this_dir, this_filename = os.path.split(__file__)
@@ -480,6 +476,10 @@ class AladdinAreaQueires():
         area = csv_area * (datawidth / 32)
         return area
 
+    def wire_estimate_area(self, interface):
+        # ignore the area of the wires
+        return 0
+    
     def intmac_estimate_area(self, interface):
         # mac is naively modeled as adder and multiplier
         adder_area = self.intadder_estimate_area(interface)
