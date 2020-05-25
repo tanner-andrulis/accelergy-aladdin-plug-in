@@ -108,7 +108,7 @@ class AladdinTable(object):
         technology = interface['attributes']['technology']
         if (technology == 40  or technology == '40' or technology == '40nm' or
             technology == 45  or technology == '45' or technology == '45nm') \
-                and class_name in self.supported_pc and not class_name == 'wire':
+                and class_name in self.supported_pc:
             return ALADDIN_ACCURACY
         return 0  # if not supported, accuracy is 0
 
@@ -260,6 +260,10 @@ class AladdinTable(object):
             return E
         else:
             return 0
+
+    def wire_estimate_area(self, interface):
+        # ignore the area of the wires
+        return 0
 
     def comparator_estimate_energy(self, interface):
         datawidth = interface['attributes']['datawidth']
