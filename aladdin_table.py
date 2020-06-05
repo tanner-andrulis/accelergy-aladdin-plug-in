@@ -27,12 +27,6 @@ from copy import deepcopy
 from accelergy.helper_functions import oneD_linear_interpolation, oneD_quadratic_interpolation
 
 class AladdinTable(object):
-    """
-    A dummy estimation plug-in
-    Note that this plug-in is just a placeholder to illustrate the estimation plug-in interface
-    It can be used as a template for creating user-defined plug-ins
-    The energy values returned by this plug-in is not meaningful
-    """
     # -------------------------------------------------------------------------------------
     # Interface functions, function name, input arguments, and output have to adhere
     # -------------------------------------------------------------------------------------
