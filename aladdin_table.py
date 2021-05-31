@@ -34,10 +34,10 @@ class AladdinTable(object):
         self.estimator_name =  "Aladdin_table"
 
         # example primitive classes supported by this estimator
-        self.supported_pc = ['regfile', 'counter', 'comparator', 'crossbar', 'wire', 'FIFO',
+        self.supported_pc = ['regfile', 'SRAM', 'counter', 'comparator', 'crossbar', 'wire', 'FIFO',
                              'bitwise', 'intadder', 'intmultiplier', 'intmac',
                              'fpadder', 'fpmultiplier', 'fpmac', 'reg']
-        self.aladdin_area_quries = AladdinAreaQueires(self.supported_pc)
+        self.aladdin_area_queries = AladdinAreaQueires(self.supported_pc)
 
     def primitive_action_supported(self, interface):
         """
@@ -103,6 +103,16 @@ class AladdinTable(object):
         if (technology == 40  or technology == '40' or technology == '40nm' or
             technology == 45  or technology == '45' or technology == '45nm') \
                 and class_name in self.supported_pc:
+
+            # small SRAM can be approximated as regfile
+            if (class_name == "SRAM"):
+                width = interface['attributes']['width']
+                depth = interface['attributes']['depth']
+                if (depth <= 128 and width <= 16):
+                    return ALADDIN_ACCURACY
+                else:
+                    return 0
+
             return ALADDIN_ACCURACY
         return 0  # if not supported, accuracy is 0
 
@@ -119,7 +129,7 @@ class AladdinTable(object):
         :rtype: float
 
         """
-        area = self.aladdin_area_quries.estimate_area(interface)
+        area = self.aladdin_area_queries.estimate_area(interface)
         return area
 
     # ============================================================
@@ -150,6 +160,10 @@ class AladdinTable(object):
                     break
         return energy
 
+
+    def SRAM_estimate_energy(self, interface):
+        return self.regfile_estimate_energy(interface)
+
     def regfile_estimate_energy(self, interface):
         width = interface['attributes']['width']
         depth = interface['attributes']['depth']
@@ -166,8 +180,17 @@ class AladdinTable(object):
                                     'action_name': 'idle'}
             comparator_energy = self.comparator_estimate_energy(comparator_interface)
         else:
-            data_delta = interface['arguments']['data_delta']
-            address_delta = interface['arguments']['address_delta']
+
+            if (interface['arguments'] is not None):
+                data_delta = interface['arguments']['data_delta']
+            else:
+                data_delta = 1
+
+            if (interface['arguments'] is not None):
+                address_delta = interface['arguments']['address_delta']
+            else:
+                address_delta = 1
+
             reg_interface = deepcopy(interface)
             if data_delta == 0:
                 reg_interface['action_name'] = 'idle'
@@ -404,6 +427,10 @@ class AladdinAreaQueires():
                     area = float(row['area(um^2)'])
                     break
         return area
+
+
+    def SRAM_estimate_area(self, interface):
+        return self.regfile_estimate_area(interface)
 
     def regfile_estimate_area(self, interface):
         # register file access is naively modeled as vector access of registers
