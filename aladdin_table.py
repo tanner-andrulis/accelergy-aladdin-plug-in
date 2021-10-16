@@ -61,6 +61,13 @@ class AladdinTable(object):
         if (technology == 40  or technology == '40' or technology == '40nm' or
             technology == 45  or technology == '45' or technology == '45nm') \
                 and class_name in self.supported_pc:
+            if (class_name == "SRAM"):
+                width = interface['attributes']['width']
+                depth = interface['attributes']['depth']
+                if (depth <= 128 and width <= 16):
+                    return ALADDIN_ACCURACY
+                else:
+                    return 0
             return ALADDIN_ACCURACY
         return 0  # if not supported, accuracy is 0
 
