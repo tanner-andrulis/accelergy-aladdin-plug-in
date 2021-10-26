@@ -261,8 +261,8 @@ class AladdinTable(object):
 
     def wire_estimate_energy(self, interface):
         action_name = interface['action_name']
-        if action_name == 'transfer':
-            len_str = interface['attributes']['length']
+        if action_name == 'transfer' or action_name == "transfer_random":
+            len_str = str(interface['attributes']['length'])
             if 'm' not in len_str:
                 length = float(len_str)
             else:
@@ -281,7 +281,9 @@ class AladdinTable(object):
             VDD = 1
             alpha = 0.2
             E = datawidth * alpha * C * length * VDD ** 2 * 10**12
+            print(E)
             return E
+
         else:
             return 0
 
