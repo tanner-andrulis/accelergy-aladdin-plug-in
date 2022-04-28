@@ -267,11 +267,11 @@ class AladdinTable(object):
                 length = float(len_str)
             else:
                 if 'mm' in len_str:
-                    length = float(len_str.split['mm'])*10**-3
+                    length = float(len_str.split('mm')[0])*10**-3
                 elif 'um' in len_str:
-                    length = float(len_str.split['mm']) * 10 ** -6
+                    length = float(len_str.split('mm')[0]) * 10 ** -6
                 elif 'nm' in len_str:
-                    length = float(len_str.split['mm']) * 10 ** -9
+                    length = float(len_str.split('mm')[0]) * 10 ** -9
                 else:
                     print('ALADDIN WARN: not recognizing the unit of the wire length, 0 energy')
                     length = 0
@@ -281,7 +281,6 @@ class AladdinTable(object):
             VDD = 1
             alpha = 0.2
             E = datawidth * alpha * C * length * VDD ** 2 * 10**12
-            print(E)
             return E
 
         else:
