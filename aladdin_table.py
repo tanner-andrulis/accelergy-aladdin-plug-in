@@ -273,6 +273,7 @@ class AladdinTable(object):
                     length_um = float(len_str.split('um')[0]) 
                 elif 'nm' in len_str:
                     length_um = float(len_str.split('nm')[0]) * 10 ** -3
+
                 else:
                     print('ALADDIN WARN: not recognizing the unit of the wire length, 0 energy')
                     length_um = 0
