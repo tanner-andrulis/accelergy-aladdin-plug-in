@@ -64,7 +64,7 @@ class AladdinTable(object):
             if (class_name == "SRAM"):
                 width = interface['attributes']['width']
                 depth = interface['attributes']['depth']
-                if (depth <= 128 and width <= 16):
+                if (depth <= 128 and width <= 32):
                     return ALADDIN_ACCURACY
                 else:
                     return 0
@@ -264,25 +264,25 @@ class AladdinTable(object):
         if action_name == 'transfer' or action_name == "transfer_random":
             len_str = str(interface['attributes']['length'])
             if 'm' not in len_str:
-                length = float(len_str)
+                length_um = float(len_str)
+                print("ALADDIN WARN: No wire length unit provided, default to um")
             else:
                 if 'mm' in len_str:
-                    length = float(len_str.split['mm'])*10**-3
+                    length_um = float(len_str.split('mm')[0]) * 10 ** 3
                 elif 'um' in len_str:
-                    length = float(len_str.split['mm']) * 10 ** -6
+                    length_um = float(len_str.split('um')[0]) 
                 elif 'nm' in len_str:
-                    length = float(len_str.split['mm']) * 10 ** -9
+                    length_um = float(len_str.split('nm')[0]) * 10 ** -3
                 else:
                     print('ALADDIN WARN: not recognizing the unit of the wire length, 0 energy')
-                    length = 0
+                    length_um = 0
 
             datawidth = interface['attributes']['datawidth']
-            C = 1.627 * 10**-15
+            C_per_um = 1.627 * 10 **-15 # F per um
             VDD = 1
             alpha = 0.2
-            E = datawidth * alpha * C * length * VDD ** 2 * 10**12
-            print(E)
-            return E
+            E_pJ = datawidth * alpha * C_per_um * length_um * VDD ** 2 * 10**12 
+            return E_pJ
 
         else:
             return 0
