@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from accelergy.plug_in_interface.interface import *
 ALADDIN_ACCURACY = 70  # in your metric, please set the accuracy you think Aladdin's estimations are
 # MIT License
 #
@@ -26,85 +27,61 @@ import csv, os, sys, math
 from copy import deepcopy
 from accelergy.helper_functions import oneD_linear_interpolation, oneD_quadratic_interpolation
 
-class AladdinTable(object):
+class AladdinTable(AccelergyPlugIn):
     # -------------------------------------------------------------------------------------
     # Interface functions, function name, input arguments, and output have to adhere
     # -------------------------------------------------------------------------------------
     def __init__(self):
         self.estimator_name =  "Aladdin_table"
-
         # example primitive classes supported by this estimator
         self.supported_pc = ['regfile', 'SRAM', 'counter', 'comparator', 'crossbar', 'wire', 'FIFO',
                              'bitwise', 'intadder', 'intmultiplier', 'intmac',
                              'fpadder', 'fpmultiplier', 'fpmac', 'reg']
-        self.aladdin_area_queries = AladdinAreaQueires(self.supported_pc)
+        self.aladdin_area_query_plug_ins = AladdinAreaQueires(self.supported_pc)
 
-    def primitive_action_supported(self, interface):
-        """
-        :param interface:
-        - contains four keys:
-        1. class_name : string
-        2. attributes: dictionary of name: value
-        3. action_name: string
-        4. arguments: dictionary of name: value
+    def get_name(self) -> str:
+        return self.estimator_name
 
-        :type interface: dict
+    def primitive_action_supported(self, query: AccelergyQuery) -> AccuracyEstimation:
+        class_name = query.class_name
+        attributes = query.class_attrs
+        action_name = query.action_name
+        arguments = query.action_args
+        # Legacy interface dictionary has keys class_name, attributes, action_name, and arguments
+        interface = query.to_legacy_interface_dict()
 
-        :return return the accuracy if supported, return 0 if not
-        :rtype: int
-
-        """
-        if 'technology' not in interface['attributes']:
-            print('ALADDIN WARN: no technology specified in the request, cannot perform estimation')
-        class_name = interface['class_name']
-        technology = interface['attributes']['technology']
+        assert 'technology' in attributes, 'No technology specified in the request.'
+        technology = attributes['technology']
         if (technology == 40  or technology == '40' or technology == '40nm' or
             technology == 45  or technology == '45' or technology == '45nm') \
                 and class_name in self.supported_pc:
             if (class_name == "SRAM"):
-                width = interface['attributes']['width']
-                depth = interface['attributes']['depth']
+                width = attributes['width']
+                depth = attributes['depth']
                 if (depth <= 128 and width <= 32):
-                    return ALADDIN_ACCURACY
+                    return AccuracyEstimation(ALADDIN_ACCURACY)
                 else:
-                    return 0
-            return ALADDIN_ACCURACY
-        return 0  # if not supported, accuracy is 0
+                    return AccuracyEstimation(0)
+            return AccuracyEstimation(ALADDIN_ACCURACY)
+        return AccuracyEstimation(0)  # if not supported, accuracy is 0
 
 
-    def estimate_energy(self, interface):
-        """
-        :param interface:
-        - contains four keys:
-        1. class_name : string
-        2. attributes: dictionary of name: value
-        3. action_name: string
-        4. arguments: dictionary of name: value
+    def estimate_energy(self, query: AccelergyQuery) -> Estimation:
+        class_name = query.class_name
+        # Legacy interface dictionary has keys class_name, attributes, action_name, and arguments
+        interface = query.to_legacy_interface_dict()
 
-       :return the estimated energy
-       :rtype float
-
-        """
-        class_name = interface['class_name']
         query_function_name = class_name + '_estimate_energy'
         energy = getattr(self, query_function_name)(interface)
-        return energy
+        return Estimation(energy, 'p') # energy is in pJ
 
-    def primitive_area_supported(self, interface):
-        """
-        :param interface:
-        - contains two keys:
-        1. class_name : string
-        2. attributes: dictionary of name: value
+    def primitive_area_supported(self, query: AccelergyQuery) -> AccuracyEstimation:
+        class_name = query.class_name
+        # Legacy interface dictionary has keys class_name, attributes, action_name, and arguments
+        interface = query.to_legacy_interface_dict()
 
-        :type interface: dict
 
-        :return return the accuracy if supported, return 0 if not
-        :rtype: int
-
-        """
-        if 'technology' not in interface['attributes']:
-            print('ALADDIN WARN: no technology specified in the request, cannot perform estimation')
+        assert 'technology' in interface['attributes'], 'No technology specified in the request.'
         class_name = interface['class_name']
         technology = interface['attributes']['technology']
         if (technology == 40  or technology == '40' or technology == '40nm' or
@@ -116,40 +93,30 @@ class AladdinTable(object):
                 width = interface['attributes']['width']
                 depth = interface['attributes']['depth']
                 if (depth <= 128 and width <= 16):
-                    return ALADDIN_ACCURACY
+                    return AccuracyEstimation(ALADDIN_ACCURACY)
                 else:
-                    return 0
+                    return AccuracyEstimation(0)
 
-            return ALADDIN_ACCURACY
-        return 0  # if not supported, accuracy is 0
+            return AccuracyEstimation(ALADDIN_ACCURACY)
+        return AccuracyEstimation(0)  # if not supported, accuracy is 0
 
-    def estimate_area(self, interface):
-        """
-        :param interface:
-        - contains two keys:
-        1. class_name : string
-        2. attributes: dictionary of name: value
-
-        :type interface: dict
-
-        :return the estimated area
-        :rtype: float
-
-        """
-        area = self.aladdin_area_queries.estimate_area(interface)
-        return area
+    def estimate_area(self, query: AccelergyQuery) -> Estimation:
+        # Legacy interface dictionary has keys class_name, attributes, action_name, and arguments
+        interface = query.to_legacy_interface_dict()
+        area = self.aladdin_area_query_plug_ins.estimate_area(interface)
+        return Estimation(area, 'u^2') # area is in um^2
 
     # ============================================================
     # User's functions, purely user-defined
     # ============================================================
     @staticmethod
     def query_csv_using_latency(interface, csv_file_path):
-        # default latency for Aladdin estimation is 5ns
+        # default latency for Aladdin estimation is 
         latency = interface['attributes']['latency'] if 'latency' in interface['attributes'] else 5
         # round to an existing latency (can perform linear interpolation as well)
-        if type(latency) is str and 'ns' in latency:
+        if isinstance(latency, str) and 'ns' in latency:
             latency = math.ceil(float(latency.split('ns')[0]))
-        elif type(latency) is str and 'ps' in latency:
+        elif isinstance(latency, str) and 'ps' in latency:
             latency = math.ceil(float(latency.split('ps')[0])/1000)
         else:
             latency = math.ceil(latency)
@@ -265,17 +232,17 @@ class AladdinTable(object):
             len_str = str(interface['attributes']['length'])
             if 'm' not in len_str:
                 length_um = float(len_str)
-                print("ALADDIN WARN: No wire length unit provided, default to um")
+                self.logger.warn("No wire length unit provided, default to um")
             else:
                 if 'mm' in len_str:
                     length_um = float(len_str.split('mm')[0]) * 10 ** 3
                 elif 'um' in len_str:
-                    length_um = float(len_str.split('um')[0]) 
+                    length_um = float(len_str.split('um')[0])
                 elif 'nm' in len_str:
                     length_um = float(len_str.split('nm')[0]) * 10 ** -3
 
                 else:
-                    print('ALADDIN WARN: not recognizing the unit of the wire length, 0 energy')
+                    self.logger.warn('Not recognizing the unit of the wire length, 0 energy')
                     length_um = 0
 
             datawidth = interface['attributes']['datawidth']
@@ -414,14 +381,14 @@ class AladdinAreaQueires():
 
     @staticmethod
     def query_csv_area_using_latency(interface, csv_file_path):
-        # default latency for Aladdin estimation is 5ns
+        # default latency for Aladdin estimation is 
         if 'latency' in interface['attributes']:
             latency = interface['attributes']['latency']
         else:
             latency = 5
         # round to an exist
         # ing latency (can perform linear interpolation as well)
-        if type(latency) is str and 'ns' in latency:
+        if isinstance(latency, str) and 'ns' in latency:
             latency = math.ceil(float(latency.split('ns')[0]))
         else:
             latency = math.ceil(latency)
