@@ -32,7 +32,6 @@ class AladdinTable(AccelergyPlugIn):
     # Interface functions, function name, input arguments, and output have to adhere
     # -------------------------------------------------------------------------------------
     def __init__(self):
-        self.estimator_name =  "Aladdin_table"
         # example primitive classes supported by this estimator
         self.supported_pc = ['regfile', 'SRAM', 'counter', 'comparator', 'crossbar', 'wire', 'FIFO',
                              'bitwise', 'intadder', 'intmultiplier', 'intmac',
@@ -40,7 +39,7 @@ class AladdinTable(AccelergyPlugIn):
         self.aladdin_area_query_plug_ins = AladdinAreaQueires(self.supported_pc)
 
     def get_name(self) -> str:
-        return self.estimator_name
+        return 'Aladdin_table'
 
     def primitive_action_supported(self, query: AccelergyQuery) -> AccuracyEstimation:
         class_name = query.class_name
